@@ -4,8 +4,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+import google.generativeai as genai
 
 st.title("AI Document Chatbot")
+
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
 
@@ -44,9 +48,28 @@ if uploaded_file:
 
         D, I = index.search(question_embedding, k=3)
 
-        answer = ""
+        context = ""
         for idx in I[0]:
-            answer += chunks[idx] + "\n\n"
+            context += chunks[idx] + "\n\n"
 
-        st.subheader("Answer")
-        st.write(answer)
+        prompt = f"""
+        You are an AI document assistant.
+        Answer the user's question using only the context below.
+        If the answer is not in the document, say: "I could not find that information in the document."
+
+        Context:
+        {context}
+
+        Question:
+        {question}
+
+        Answer clearly in simple language:
+        """
+
+        response = gemini_model.generate_content(prompt)
+
+        st.subheader("AI Answer")
+        st.write(response.text)
+
+        with st.expander("View retrieved document context"):
+            st.write(context)
